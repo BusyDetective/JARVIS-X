@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results — {{ domain }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #080f1a;
+            --surface:   #0d1829;
+            --surface2:  #111f33;
+            --border:    #1a2d4a;
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --blue:      #38bdf8;
+            --red:       #ff4d6d;
+            --amber:     #fbbf24;
+            --purple:    #a78bfa;
+            --text:      #c8d8e8;
+            --muted:     #4a6080;
+            --mono:      'JetBrains Mono', monospace;
+            --sans:      'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Nav ── */
+        nav {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo { font-family: var(--mono); font-size: 13px; color: var(--green); letter-spacing: 0.08em; }
+        .nav-logo span { color: var(--muted); }
+
+        .nav-links { display: flex; gap: 24px; list-style: none; }
+        .nav-links a { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; letter-spacing: 0.05em; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--green); }
+
+        /* ── Main ── */
+        main {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1200px;
+            padding: 40px 20px 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* ── Page header ── */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .page-title { font-family: var(--mono); font-size: 22px; font-weight: 700; color: #f0f8ff; }
+        .page-title span { color: var(--green); }
+        .page-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            padding: 10px 18px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary { background: var(--green); color: #080f1a; }
+        .btn-primary:hover { background: var(--green-dim); box-shadow: 0 0 16px rgba(0,255,136,0.25); }
+
+        .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+        .btn-outline:hover { color: var(--blue); border-color: var(--blue); }
+
+        /* ── Stats grid ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .stat {
+            background: var(--surface);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; color: #f0f8ff; }
+        .stat-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+        .stat-value.critical { color: var(--purple); }
+        .stat-value.high     { color: var(--red); }
+        .stat-value.medium   { color: var(--amber); }
+        .stat-value.green    { color: var(--green); }
+
+        /* ── Risk summary row ── */
+        .risk-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .risk-cell {
+            background: var(--surface);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .risk-count { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+        .risk-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+        /* ── Card ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .dot-red   { background: var(--red); }
+        .dot-amber { background: var(--amber); }
+        .dot-green { background: var(--green); }
+
+        .card-title { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 600; letter-spacing: 0.04em; margin-left: 4px; }
+        .card-count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+        .card-body { padding: 20px; }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            padding: 13px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .badge-critical { color: var(--purple); background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.25); }
+        .badge-high     { color: var(--red);    background: rgba(255,77,109,0.1);   border: 1px solid rgba(255,77,109,0.25); }
+        .badge-medium   { color: var(--amber);  background: rgba(251,191,36,0.1);   border: 1px solid rgba(251,191,36,0.25); }
+        .badge-low      { color: var(--green);  background: rgba(0,255,136,0.08);   border: 1px solid rgba(0,255,136,0.2); }
+        .badge-info     { color: var(--blue);   background: rgba(56,189,248,0.08);  border: 1px solid rgba(56,189,248,0.2); }
+        .badge-confirmed{ color: var(--green);  background: rgba(0,255,136,0.08);   border: 1px solid rgba(0,255,136,0.2); }
+        .badge-possible { color: var(--amber);  background: rgba(251,191,36,0.1);   border: 1px solid rgba(251,191,36,0.25); }
+        .badge-failed   { color: var(--muted);  background: rgba(74,96,128,0.1);    border: 1px solid rgba(74,96,128,0.2); }
+
+        /* ── Finding card ── */
+        .finding {
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .finding:last-child { margin-bottom: 0; }
+
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--surface2);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .finding-header:hover { background: rgba(0,255,136,0.04); }
+
+        .finding-title { font-family: var(--mono); font-size: 13px; font-weight: 600; color: #f0f8ff; flex: 1; }
+        .finding-url { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+
+        .finding-meta { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+        .finding-body {
+            display: none;
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .finding-body.open { display: block; }
+
+        .finding-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; color: var(--muted); }
+        .finding-row:last-child { margin-bottom: 0; }
+        .finding-row-key { flex-shrink: 0; width: 90px; color: var(--muted); }
+        .finding-row-val { color: var(--text); word-break: break-all; }
+
+        code {
+            font-family: var(--mono);
+            font-size: 11px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 2px 6px;
+            color: var(--green);
+            word-break: break-all;
+        }
+
+        /* ── Simple list items ── */
+        .list-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .list-item:last-child { border-bottom: none; }
+
+        .list-item a { color: var(--blue); text-decoration: none; word-break: break-all; }
+        .list-item a:hover { color: var(--green); }
+
+        /* ── Table ── */
+        table { width: 100%; border-collapse: collapse; }
+
+        thead th {
+            padding: 10px 14px;
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--muted);
+            text-align: left;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+        }
+
+        tbody td {
+            padding: 10px 14px;
+            font-family: var(--mono);
+            font-size: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(0,255,136,0.02); }
+
+        /* ── Risk breakdown bar ── */
+        .risk-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 4px; }
+        .risk-bar-fill { height: 100%; border-radius: 2px; }
+
+        /* ── Chart ── */
+        .chart-wrap { max-width: 320px; margin: 0 auto; }
+
+        /* ── Attack chain ── */
+        .chain {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .chain:last-child { margin-bottom: 0; }
+
+        .chain-step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+        .chain-step:last-child { margin-bottom: 0; }
+        .chain-step-label { color: var(--muted); flex-shrink: 0; width: 56px; }
+        .chain-step-url { color: var(--text); word-break: break-all; }
+
+        /* ── Screenshot grid ── */
+        .shot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+        .shot-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .shot-card-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .shot-card img { width: 100%; display: block; }
+
+        /* ── Empty state ── */
+        .empty { padding: 40px 20px; text-align: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+        /* ── Tag pill ── */
+        .tag { font-family: var(--mono); font-size: 10px; color: var(--blue); background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.15); padding: 1px 6px; border-radius: 2px; }
+
+        /* ── Filter bar ── */
+        .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+        .filter-btn {
+            font-family: var(--mono);
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 2px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover { border-color: var(--green); color: var(--green); }
+        .filter-btn.active { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.06); }
+
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: auto;
+            padding: 24px 20px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            border-top: 1px solid var(--border);
+            width: 100%;
+        }
+
+        @media (max-width: 700px) {
+            .stats-grid, .risk-row { grid-template-columns: repeat(2, 1fr); }
+            .finding-url { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo"><span>//</span> recon.ai</div>
+    <ul class="nav-links">
+        <li><a href="/">new scan</a></li>
+        <li><a href="/history">history</a></li>
+        <li><a href="/logout">logout</a></li>
+    </ul>
+</nav>
+
+<main>
+
+    <!-- Page header -->
+    <div class="page-header">
+        <div>
+            <div class="page-title">Results — <span>{{ domain }}</span></div>
+            <div class="page-sub">Task {{ task_id[:8] if task_id else '—' }} &nbsp;·&nbsp; {{ findings|length }} findings &nbsp;·&nbsp; {{ endpoints|length }} endpoints</div>
+        </div>
+        <div class="header-actions">
+            <a href="/download_pdf/{{ task_id }}" class="btn btn-primary">↓ Download PDF</a>
+            <a href="/" class="btn btn-outline">+ New Scan</a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat">
+            <div class="stat-value green">{{ subdomains|length if subdomains else 0 }}</div>
+            <div class="stat-label">Subdomains</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">{{ live_hosts|length if live_hosts else 0 }}</div>
+            <div class="stat-label">Live Hosts</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">{{ endpoints|length if endpoints else 0 }}</div>
+            <div class="stat-label">Endpoints</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value high">{{ findings|length if findings else 0 }}</div>
+            <div class="stat-label">Findings</div>
+        </div>
+    </div>
+
+    <!-- Risk summary -->
+    <div class="risk-row">
+        <div class="risk-cell">
+            <div>
+                <div class="risk-count" style="color:var(--purple)">{{ risk.critical|length if risk.critical else 0 }}</div>
+                <div class="risk-label">Critical</div>
+            </div>
+        </div>
+        <div class="risk-cell">
+            <div>
+                <div class="risk-count" style="color:var(--red)">{{ risk.high|length if risk.high else 0 }}</div>
+                <div class="risk-label">High</div>
+            </div>
+        </div>
+        <div class="risk-cell">
+            <div>
+                <div class="risk-count" style="color:var(--amber)">{{ risk.medium|length if risk.medium else 0 }}</div>
+                <div class="risk-label">Medium</div>
+            </div>
+        </div>
+        <div class="risk-cell">
+            <div>
+                <div class="risk-count" style="color:var(--green)">{{ risk.low|length if risk.low else 0 }}</div>
+                <div class="risk-label">Low</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main tabbed card -->
+    <div class="card">
+        <div class="tabs" id="mainTabs">
+            <button class="tab-btn active" onclick="switchTab('findings')">⚠ Findings ({{ findings|length }})</button>
+            <button class="tab-btn" onclick="switchTab('exploits')">💣 Exploits ({{ exploits|length if exploits else 0 }})</button>
+            <button class="tab-btn" onclick="switchTab('endpoints')">📂 Endpoints ({{ endpoints|length }})</button>
+            <button class="tab-btn" onclick="switchTab('subdomains')">🌐 Subdomains ({{ subdomains|length if subdomains else 0 }})</button>
+            <button class="tab-btn" onclick="switchTab('attack')">🗺 Attack Surface</button>
+            <button class="tab-btn" onclick="switchTab('js')">⚙ JS Intel ({{ js_intelligence|length if js_intelligence else 0 }})</button>
+            <button class="tab-btn" onclick="switchTab('tech')">🔬 Technologies</button>
+            <button class="tab-btn" onclick="switchTab('recon')">📸 Recon</button>
+        </div>
+
+        <!-- ══ FINDINGS TAB ══ -->
+        <div class="tab-panel active card-body" id="tab-findings">
+            {% if findings %}
+
+            <div class="filter-bar">
+                <button class="filter-btn active" onclick="filterFindings('all', this)">All</button>
+                <button class="filter-btn" onclick="filterFindings('Critical', this)">Critical</button>
+                <button class="filter-btn" onclick="filterFindings('High', this)">High</button>
+                <button class="filter-btn" onclick="filterFindings('Medium', this)">Medium</button>
+                <button class="filter-btn" onclick="filterFindings('Low', this)">Low</button>
+            </div>
+
+            <div id="findingsList">
+            {% for f in findings %}
+                {% if f is mapping %}
+                    {% set sev = f.severity | default('Low') %}
+                    {% set sev_lower = sev | lower %}
+                    <div class="finding" data-severity="{{ sev }}">
+                        <div class="finding-header" onclick="toggleFinding(this)">
+                            <span class="badge badge-{{ sev_lower }}">{{ sev }}</span>
+                            <span class="finding-title">{{ f.type | default('Unknown') }}</span>
+                            <span class="finding-url">{{ f.url | default('') }}</span>
+                            <div class="finding-meta">
+                                {% if f.cvss %}
+                                    <span class="badge badge-info">CVSS {{ f.cvss }}</span>
+                                {% endif %}
+                                {% if f.confidence %}
+                                    {% if f.confidence >= 80 %}
+                                        <span class="badge badge-confirmed">{{ f.confidence }}%</span>
+                                    {% else %}
+                                        <span class="badge badge-possible">{{ f.confidence }}%</span>
+                                    {% endif %}
+                                {% endif %}
+                                <span style="color:var(--muted); font-family:var(--mono); font-size:12px;">›</span>
+                            </div>
+                        </div>
+                        <div class="finding-body">
+                            <div class="finding-row">
+                                <span class="finding-row-key">URL</span>
+                                <span class="finding-row-val"><a href="{{ f.url }}" target="_blank" style="color:var(--blue)">{{ f.url }}</a></span>
+                            </div>
+                            {% if f.reason %}
+                            <div class="finding-row">
+                                <span class="finding-row-key">Reason</span>
+                                <span class="finding-row-val">{{ f.reason }}</span>
+                            </div>
+                            {% endif %}
+                            {% if f.poc and f.poc != f.url %}
+                            <div class="finding-row">
+                                <span class="finding-row-key">PoC URL</span>
+                                <span class="finding-row-val"><code>{{ f.poc }}</code></span>
+                            </div>
+                            {% endif %}
+                            {% if f.cvss %}
+                            <div class="finding-row">
+                                <span class="finding-row-key">CVSS</span>
+                                <span class="finding-row-val">{{ f.cvss }} ({{ sev }})</span>
+                            </div>
+                            {% endif %}
+                            {% if f.confidence %}
+                            <div class="finding-row">
+                                <span class="finding-row-key">Confidence</span>
+                                <span class="finding-row-val">{{ f.confidence }}%</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            </div>
+
+            {% else %}
+            <div class="empty">No findings detected</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ EXPLOITS TAB ══ -->
+        <div class="tab-panel card-body" id="tab-exploits">
+            {% if exploits %}
+                {% for exp in exploits %}
+                {% if exp.payload != "Unknown" %}
+                <div class="finding" style="margin-bottom:10px">
+                    <div class="finding-header" onclick="toggleFinding(this)">
+                        <span class="badge badge-high">PoC</span>
+                        <span class="finding-title">{{ exp.type | default('Unknown') }}</span>
+                        <span class="finding-url">{{ exp.poc | default('') }}</span>
+                        <span style="color:var(--muted); font-family:var(--mono); font-size:12px; margin-left:auto;">›</span>
+                    </div>
+                    <div class="finding-body">
+                        <div class="finding-row">
+                            <span class="finding-row-key">PoC URL</span>
+                            <span class="finding-row-val"><a href="{{ exp.poc }}" target="_blank" style="color:var(--blue)">{{ exp.poc }}</a></span>
+                        </div>
+                        <div class="finding-row">
+                            <span class="finding-row-key">Payload</span>
+                            <span class="finding-row-val"><code>{{ exp.payload }}</code></span>
+                        </div>
+                        {% if exp.impact %}
+                        <div class="finding-row">
+                            <span class="finding-row-key">Impact</span>
+                            <span class="finding-row-val">{{ exp.impact }}</span>
+                        </div>
+                        {% endif %}
+                        {% if exp.remediation %}
+                        <div class="finding-row">
+                            <span class="finding-row-key">Fix</span>
+                            <span class="finding-row-val">{{ exp.remediation }}</span>
+                        </div>
+                        {% endif %}
+                        {% if exp.steps %}
+                        <div class="finding-row" style="flex-direction:column; gap:6px;">
+                            <span class="finding-row-key" style="width:auto">Steps</span>
+                            {% for step in exp.steps %}
+                            <div style="color:var(--text); padding-left:4px">{{ loop.index }}. {{ step }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% if exp.curl %}
+                        <div class="finding-row">
+                            <span class="finding-row-key">cURL</span>
+                            <span class="finding-row-val"><code>{{ exp.curl }}</code></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+
+                {% if validated_exploits %}
+                <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border)">
+                    <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:12px; letter-spacing:0.1em; text-transform:uppercase;">Validation Results</div>
+                    {% for v in validated_exploits %}
+                    <div class="list-item">
+                        {% set status = v.status | default('UNVERIFIED') %}
+                        {% if status == 'CONFIRMED' %}
+                            <span class="badge badge-confirmed">CONFIRMED</span>
+                        {% elif status == 'POSSIBLE' %}
+                            <span class="badge badge-possible">POSSIBLE</span>
+                        {% else %}
+                            <span class="badge badge-failed">{{ status }}</span>
+                        {% endif %}
+                        <span style="font-family:var(--mono); font-size:12px; color:var(--text)">{{ v.type }}</span>
+                        <span style="color:var(--muted)">{{ v.confidence }}%</span>
+                        {% if v.evidence %}
+                        <span style="color:var(--muted); font-size:11px">— {{ v.evidence }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            {% else %}
+            <div class="empty">No exploits generated</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ ENDPOINTS TAB ══ -->
+        <div class="tab-panel card-body" id="tab-endpoints">
+            {% if endpoints %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for ep in endpoints[:200] %}
+                <tr>
+                    <td><a href="{{ ep.url if ep is mapping else ep }}" target="_blank" style="color:var(--blue); word-break:break-all">{{ ep.url if ep is mapping else ep }}</a></td>
+                    <td>
+                        {% if ep is mapping and ep.tags %}
+                            {% for tag in ep.tags %}
+                                <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No endpoints discovered</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ SUBDOMAINS TAB ══ -->
+        <div class="tab-panel card-body" id="tab-subdomains">
+            {% if subdomains %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Subdomain</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for sub in subdomains %}
+                {% set host_data = live_host_map.get(sub) %}
+                <tr>
+                    <td style="font-family:var(--mono); font-size:12px">{{ sub }}</td>
+                    <td>
+                        {% if host_data %}
+                            <span class="badge badge-confirmed">ALIVE {{ host_data.status }}</span>
+                        {% else %}
+                            <span class="badge badge-failed">–</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No subdomains found</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ ATTACK SURFACE TAB ══ -->
+        <div class="tab-panel card-body" id="tab-attack">
+            {% if attack_surface %}
+
+            {% if attack_surface.high_value_targets %}
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:12px; letter-spacing:0.1em; text-transform:uppercase;">High Value Targets</div>
+            <table style="margin-bottom:24px">
+                <thead>
+                    <tr><th>URL</th><th>Score</th></tr>
+                </thead>
+                <tbody>
+                {% for t in attack_surface.high_value_targets[:15] %}
+                <tr>
+                    <td><a href="{{ t.url }}" target="_blank" style="color:var(--blue); word-break:break-all">{{ t.url }}</a></td>
+                    <td><span class="badge badge-high">{{ t.score }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if attack_surface.chains %}
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:12px; letter-spacing:0.1em; text-transform:uppercase;">Attack Chains</div>
+            {% for chain in attack_surface.chains[:10] %}
+            <div class="chain">
+                <div class="chain-step">
+                    <span class="chain-step-label" style="color:var(--green)">Entry</span>
+                    <span class="chain-step-url">{{ chain.entry[:120] if chain.entry else '—' }}</span>
+                </div>
+                <div class="chain-step">
+                    <span class="chain-step-label" style="color:var(--amber)">Pivot</span>
+                    <span class="chain-step-url">{{ chain.pivot[:120] if chain.pivot else '—' }}</span>
+                </div>
+                <div class="chain-step">
+                    <span class="chain-step-label" style="color:var(--red)">Target</span>
+                    <span class="chain-step-url">{{ chain.target[:120] if chain.target else '—' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% else %}
+            <div class="empty">No attack surface data</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ JS INTEL TAB ══ -->
+        <div class="tab-panel card-body" id="tab-js">
+            {% if js_intelligence %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Value</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in js_intelligence %}
+                <tr>
+                    <td style="font-family:var(--mono); font-size:12px; white-space:nowrap">{{ item.type }}</td>
+                    <td>
+                        {% set js_sev = item.severity | default('Low') | lower %}
+                        <span class="badge badge-{{ js_sev }}">{{ item.severity | default('Low') }}</span>
+                    </td>
+                    <td><code>{{ item.value[:80] if item.value else '—' }}</code></td>
+                    <td style="font-family:var(--mono); font-size:10px; color:var(--muted); word-break:break-all">{{ item.source | default('') }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No JS intelligence findings</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ TECHNOLOGIES TAB ══ -->
+        <div class="tab-panel card-body" id="tab-tech">
+            {% if technologies %}
+            <table>
+                <thead>
+                    <tr><th>Host</th><th>Detected Stack</th></tr>
+                </thead>
+                <tbody>
+                {% for host, techs in technologies.items() %}
+                <tr>
+                    <td style="font-family:var(--mono); font-size:12px; white-space:nowrap">{{ host }}</td>
+                    <td>
+                        {% if techs %}
+                            {% for tech in techs %}
+                                <span class="tag" style="margin-right:4px; margin-bottom:4px; display:inline-block">{{ tech }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span style="color:var(--muted)">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No technology data</div>
+            {% endif %}
+        </div>
+
+        <!-- ══ RECON TAB ══ -->
+        <div class="tab-panel card-body" id="tab-recon">
+
+            <!-- Screenshots -->
+            {% if screenshots %}
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:14px; letter-spacing:0.1em; text-transform:uppercase;">Screenshots</div>
+            <div class="shot-grid" style="margin-bottom:28px">
+                {% for shot in screenshots %}
+                <div class="shot-card">
+                    <div class="shot-card-header">{{ shot.url }}</div>
+                    {% if shot.image %}
+                    <img src="{{ url_for('screenshots', filename=shot.path.split('/')[-1]) }}"
+                        alt="{{ shot.url }}"
+                        loading="lazy">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Directories -->
+            {% if directories %}
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:14px; letter-spacing:0.1em; text-transform:uppercase;">Directories</div>
+            <table style="margin-bottom:28px">
+                <thead>
+                    <tr><th>Status</th><th>Severity</th><th>URL</th><th>Note</th></tr>
+                </thead>
+                <tbody>
+                {% for d in directories %}
+                <tr>
+                    <td><span class="badge badge-info">{{ d.status }}</span></td>
+                    <td>
+                        {% set dir_sev = d.severity | default('Low') | lower %}
+                        <span class="badge badge-{{ dir_sev }}">{{ d.severity | default('Low') }}</span>
+                    </td>
+                    <td><a href="{{ d.url }}" target="_blank" style="color:var(--blue); word-break:break-all">{{ d.url }}</a></td>
+                    <td style="color:var(--muted); font-size:11px">{{ d.note | default('') }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <!-- Browser Recon -->
+            {% if browser_recon %}
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:14px; letter-spacing:0.1em; text-transform:uppercase;">Browser Recon</div>
+            {% for item in browser_recon %}
+            <div class="chain" style="margin-bottom:10px">
+                <div style="font-family:var(--mono); font-size:12px; font-weight:600; color:#f0f8ff; margin-bottom:10px">{{ item.url }}</div>
+                {% if item.data %}
+                    {% if item.data.technologies %}
+                    <div style="margin-bottom:8px">
+                        {% for tech in item.data.technologies %}
+                            <span class="tag" style="margin-right:4px">{{ tech }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if item.data.api_calls %}
+                    <div style="font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:6px">API Calls</div>
+                    {% for api in item.data.api_calls[:10] %}
+                        <div style="font-family:var(--mono); font-size:11px; color:var(--blue); margin-bottom:3px">{{ api }}</div>
+                    {% endfor %}
+                    {% endif %}
+                    {% if item.data.security_issues %}
+                    <div style="font-family:var(--mono); font-size:11px; color:var(--red); margin-top:8px">
+                        {% for issue in item.data.security_issues %}
+                            <div>⚠ {{ issue }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if not screenshots and not directories and not browser_recon %}
+            <div class="empty">No recon data</div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- Risk chart + priorities side by side -->
+    <div style="display:grid; grid-template-columns:1fr 2fr; gap:20px; align-items:start">
+
+        <!-- Chart -->
+        <div class="card">
+            <div class="card-header">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-amber"></div>
+                <div class="dot dot-green"></div>
+                <span class="card-title">risk-distribution.chart</span>
+            </div>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="riskChart"
+                        data-critical="{{ risk.critical|length if risk.critical else 0 }}"
+                        data-high="{{ risk.high|length if risk.high else 0 }}"
+                        data-medium="{{ risk.medium|length if risk.medium else 0 }}"
+                        data-low="{{ risk.low|length if risk.low else 0 }}">
+                    </canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Priority targets -->
+        <div class="card">
+            <div class="card-header">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-amber"></div>
+                <div class="dot dot-green"></div>
+                <span class="card-title">priority-targets.log</span>
+                <span class="card-count">top {{ [priorities|length, 10]|min if priorities else 0 }}</span>
+            </div>
+            <div class="card-body">
+                {% if priorities %}
+                <table>
+                    <thead>
+                        <tr><th>Priority</th><th>Score</th><th>URL</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for p in priorities[:10] %}
+                    <tr>
+                        <td>
+                            {% set pri = p.priority | default('LOW') | lower %}
+                            <span class="badge badge-{{ pri }}">{{ p.get('priority', 'LOW') }}</span>
+                        </td>
+                        <td style="color:var(--muted); font-family:var(--mono); font-size:12px">{{ p.score }}</td>
+                        <td><a href="{{ p.get('url', '') }}" target="_blank" style="color:var(--blue); word-break:break-all; font-size:12px">{{ p.url }}</a></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty">No priority targets</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+<footer>
+    AI Bug Bounty Recon &nbsp;·&nbsp; use only on authorized targets
+</footer>
+
+<script>
+    // ── Tab switching ─────────────────────────────
+    function switchTab(name) {
+        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+
+        document.getElementById("tab-" + name).classList.add("active");
+        event.currentTarget.classList.add("active");
+    }
+
+    // ── Finding expand/collapse ───────────────────
+    function toggleFinding(header) {
+        const body = header.nextElementSibling;
+        if (body && body.classList.contains("finding-body")) {
+            body.classList.toggle("open");
+        }
+    }
+
+    // ── Finding filter ────────────────────────────
+    function filterFindings(severity, btn) {
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        document.querySelectorAll("#findingsList .finding").forEach(el => {
+            const sev = el.dataset.severity || "";
+            el.style.display = (severity === "all" || sev === severity) ? "block" : "none";
+        });
+    }
+
+    // ── Risk chart ────────────────────────────────
+    const canvas = document.getElementById("riskChart");
+    if (canvas) {
+        const critical = parseInt(canvas.dataset.critical) || 0;
+        const high     = parseInt(canvas.dataset.high)     || 0;
+        const medium   = parseInt(canvas.dataset.medium)   || 0;
+        const low      = parseInt(canvas.dataset.low)      || 0;
+
+        const hasData = critical + high + medium + low > 0;
+
+        new Chart(canvas.getContext("2d"), {
+            type: "doughnut",
+            data: {
+                labels: ["Critical", "High", "Medium", "Low"],
+                datasets: [{
+                    data: hasData ? [critical, high, medium, low] : [1],
+                    backgroundColor: hasData
+                        ? ["#a78bfa", "#ff4d6d", "#fbbf24", "#00ff88"]
+                        : ["#1a2d4a"],
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: "65%",
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            color: "#4a6080",
+                            font: { family: "JetBrains Mono", size: 11 },
+                            padding: 16,
+                            boxWidth: 10,
+                            boxHeight: 10
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${ctx.raw}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

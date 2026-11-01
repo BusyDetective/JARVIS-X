@@ -1,0 +1,9 @@
+# Runtime + test + static-analysis dependencies (pytest, pytest-asyncio, respx, pyflakes). Required for `pytest -q` and validation.
+-r requirements.txt
+pytest>=8.0,<9
+pytest-asyncio>=0.23,<1
+respx>=0.21,<1
+pyflakes>=3.2,<5
+# Phase 9 test needs (dashboard TestClient, optional real-browser tests)
+httpx>=0.27,<1
+-r requirements-browser.txt

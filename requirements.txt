@@ -1,0 +1,9 @@
+# Runtime dependencies only. To run the test suite use requirements-dev.txt.
+pydantic>=2.6,<3
+pydantic-settings>=2.2,<3
+httpx>=0.27,<1
+google-genai>=1.0,<2
+python-dotenv>=1.0,<2
+# Phase 9 dashboard (FastAPI + ASGI server)
+fastapi>=0.115,<1
+uvicorn>=0.30,<1

@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan History — AI Recon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #080f1a;
+            --surface:   #0d1829;
+            --border:    #1a2d4a;
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --blue:      #38bdf8;
+            --red:       #ff4d6d;
+            --amber:     #fbbf24;
+            --purple:    #a78bfa;
+            --text:      #c8d8e8;
+            --muted:     #4a6080;
+            --mono:      'JetBrains Mono', monospace;
+            --sans:      'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        nav {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--green);
+            letter-spacing: 0.08em;
+        }
+
+        .nav-logo span { color: var(--muted); }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.05em;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--green); }
+
+        main {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1100px;
+            padding: 48px 20px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* ── Page header ── */
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .page-title {
+            font-family: var(--mono);
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f8ff;
+        }
+
+        .page-title span { color: var(--green); }
+
+        .page-sub {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .btn-new {
+            background: var(--green);
+            color: #080f1a;
+            border: none;
+            border-radius: 3px;
+            padding: 10px 20px;
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-new:hover {
+            background: var(--green-dim);
+            box-shadow: 0 0 16px rgba(0,255,136,0.25);
+        }
+
+        /* ── Stats row ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .stat {
+            background: var(--surface);
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-value {
+            font-family: var(--mono);
+            font-size: 24px;
+            font-weight: 700;
+            color: #f0f8ff;
+        }
+
+        .stat-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .stat-value.critical { color: var(--purple); }
+        .stat-value.high     { color: var(--red); }
+        .stat-value.medium   { color: var(--amber); }
+        .stat-value.low      { color: var(--green); }
+
+        /* ── Search bar ── */
+        .search-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .search-wrap {
+            position: relative;
+            flex: 1;
+            max-width: 360px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        input[type="search"] {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 9px 12px 9px 32px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="search"]::placeholder { color: var(--muted); }
+        input[type="search"]:focus { border-color: var(--green); }
+        input[type="search"]::-webkit-search-cancel-button { display: none; }
+
+        .filter-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 9px 12px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text);
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .filter-select:focus { border-color: var(--green); }
+
+        /* ── Table card ── */
+        .table-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot-red   { background: var(--red); }
+        .dot-amber { background: var(--amber); }
+        .dot-green { background: var(--green); }
+
+        .table-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-left: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .scan-count {
+            margin-left: auto;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* ── Table ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: rgba(0,0,0,0.2);
+            padding: 11px 16px;
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--muted);
+            text-align: left;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+        }
+
+        thead th:hover { color: var(--text); }
+        thead th.sorted { color: var(--green); }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: rgba(0,255,136,0.03); }
+
+        td {
+            padding: 13px 16px;
+            font-family: var(--mono);
+            font-size: 12px;
+            vertical-align: middle;
+        }
+
+        .td-domain {
+            color: #f0f8ff;
+            font-weight: 600;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .td-id {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .td-date { color: var(--muted); font-size: 11px; }
+
+        .td-count {
+            color: var(--text);
+            text-align: center;
+        }
+
+        /* ── Severity badges ── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .badge-critical {
+            color: var(--purple);
+            background: rgba(167,139,250,0.1);
+            border: 1px solid rgba(167,139,250,0.25);
+        }
+
+        .badge-high {
+            color: var(--red);
+            background: rgba(255,77,109,0.1);
+            border: 1px solid rgba(255,77,109,0.25);
+        }
+
+        .badge-medium {
+            color: var(--amber);
+            background: rgba(251,191,36,0.1);
+            border: 1px solid rgba(251,191,36,0.25);
+        }
+
+        .badge-low {
+            color: var(--green);
+            background: rgba(0,255,136,0.08);
+            border: 1px solid rgba(0,255,136,0.2);
+        }
+
+        .badge-none {
+            color: var(--muted);
+            background: rgba(74,96,128,0.1);
+            border: 1px solid rgba(74,96,128,0.2);
+        }
+
+        /* ── Risk level cell ── */
+        .risk-critical { color: var(--purple); }
+        .risk-high     { color: var(--red); }
+        .risk-medium   { color: var(--amber); }
+        .risk-low      { color: var(--green); }
+        .risk-none     { color: var(--muted); }
+
+        /* ── Action buttons ── */
+        .actions { display: flex; gap: 8px; align-items: center; }
+
+        .btn-action {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 4px 10px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s, border-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-action:hover {
+            color: var(--blue);
+            border-color: var(--blue);
+        }
+
+        /* ── Empty state ── */
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .empty-icon {
+            font-size: 32px;
+            opacity: 0.4;
+        }
+
+        .empty-title {
+            font-family: var(--mono);
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .empty-sub {
+            font-size: 12px;
+            color: var(--muted);
+            opacity: 0.6;
+        }
+
+        /* ── Hidden rows (filter) ── */
+        tr.hidden { display: none; }
+
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: auto;
+            padding: 24px 20px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            border-top: 1px solid var(--border);
+            width: 100%;
+        }
+
+        @media (max-width: 700px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .td-id, .td-date { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo"><span>//</span> recon.ai</div>
+    <ul class="nav-links">
+        <li><a href="/">new scan</a></li>
+        <li><a href="/history" style="color:var(--green)">history</a></li>
+        <li><a href="/logout">logout</a></li>
+    </ul>
+</nav>
+
+<main>
+
+    <!-- Page header -->
+    <div class="page-header">
+        <div>
+            <div class="page-title">Scan <span>History</span></div>
+            <div class="page-sub">{{ scans|length }} scan{{ 's' if scans|length != 1 else '' }} on record</div>
+        </div>
+        <a href="/" class="btn-new">+ NEW SCAN</a>
+    </div>
+
+    <!-- Stats row -->
+    {% if scans %}
+    <div class="stats-row">
+        <div class="stat">
+            <div class="stat-value">{{ scans|length }}</div>
+            <div class="stat-label">Total Scans</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value high">
+                {{ scans | selectattr('risk_level', 'equalto', 'CRITICAL') | list | length +
+                   scans | selectattr('risk_level', 'equalto', 'HIGH')     | list | length }}
+            </div>
+            <div class="stat-label">High Risk Scans</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value critical">
+                {{ scans | map(attribute='critical_count') | map('int') | sum }}
+            </div>
+            <div class="stat-label">Critical Findings</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value low">
+                {{ scans | selectattr('risk_level', 'equalto', 'LOW') | list | length }}
+            </div>
+            <div class="stat-label">Clean Scans</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search + filter -->
+    {% if scans %}
+    <div class="search-row">
+        <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input type="search" id="searchInput" placeholder="filter by domain..." oninput="filterTable()">
+        </div>
+        <select class="filter-select" id="riskFilter" onchange="filterTable()">
+            <option value="">all risk levels</option>
+            <option value="CRITICAL">critical</option>
+            <option value="HIGH">high</option>
+            <option value="MEDIUM">medium</option>
+            <option value="LOW">low</option>
+        </select>
+    </div>
+    {% endif %}
+
+    <!-- Table card -->
+    <div class="table-card">
+        <div class="table-header">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-amber"></div>
+            <div class="dot dot-green"></div>
+            <span class="table-title">scan-history.log</span>
+            <span class="scan-count" id="visibleCount">{{ scans|length }} entries</span>
+        </div>
+
+        {% if scans %}
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Domain</th>
+                    <th onclick="sortTable(1)">Date</th>
+                    <th onclick="sortTable(2)" style="text-align:center">Findings</th>
+                    <th onclick="sortTable(3)" style="text-align:center">Critical</th>
+                    <th style="text-align:center">Risk</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                {% for scan in scans %}
+                <tr data-domain="{{ scan.domain | lower }}" data-risk="{{ scan.risk_level or 'LOW' }}">
+
+                    <!-- Domain -->
+                    <td>
+                        <div class="td-domain" title="{{ scan.domain }}">{{ scan.domain }}</div>
+                        <div class="td-id" style="margin-top:3px">{{ scan.id or '—' }}</div>
+                    </td>
+
+                    <!-- Date -->
+                    <td class="td-date">
+                        {{ scan.created_at[:16] if scan.created_at else '—' }}
+                    </td>
+
+                    <!-- Total findings -->
+                    <td class="td-count">
+                        {% set total = (scan.critical_count or 0)|int +
+                                       (scan.high_count    or 0)|int +
+                                       (scan.medium_count  or 0)|int +
+                                       (scan.low_count     or 0)|int %}
+                        {{ total if total > 0 else '—' }}
+                    </td>
+
+                    <!-- Critical count -->
+                    <td style="text-align:center">
+                        {% if scan.critical_count and scan.critical_count|int > 0 %}
+                            <span class="badge badge-critical">{{ scan.critical_count }}</span>
+                        {% else %}
+                            <span style="color:var(--muted)">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Risk level -->
+                    <td>
+                        {% set rl = scan.risk_level or 'LOW' %}
+                        <span class="badge badge-{{ rl.lower() }}">{{ rl }}</span>
+                    </td>
+
+                    <!-- Actions -->
+                    <td>
+                        <div class="actions">
+                            <a href="/results/{{ scan.id }}" class="btn-action">view</a>
+                            <a href="/download_pdf/{{ scan.id }}" class="btn-action">pdf</a>
+                        </div>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <!-- Empty state -->
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <div class="empty-title">No scans yet</div>
+            <div class="empty-sub">Run your first scan to see results here</div>
+            <a href="/" class="btn-new" style="margin-top:8px">+ START SCANNING</a>
+        </div>
+        {% endif %}
+
+    </div>
+
+</main>
+
+<footer>
+    AI Bug Bounty Recon &nbsp;·&nbsp; use only on authorized targets
+</footer>
+
+<script>
+    function filterTable() {
+        const query     = document.getElementById("searchInput").value.toLowerCase();
+        const riskFilter = document.getElementById("riskFilter").value;
+        const rows      = document.querySelectorAll("#tableBody tr");
+        let visible     = 0;
+
+        rows.forEach(row => {
+            const domain = row.dataset.domain || "";
+            const risk   = row.dataset.risk   || "";
+
+            const matchDomain = domain.includes(query);
+            const matchRisk   = !riskFilter || risk === riskFilter;
+
+            if (matchDomain && matchRisk) {
+                row.classList.remove("hidden");
+                visible++;
+            } else {
+                row.classList.add("hidden");
+            }
+        });
+
+        document.getElementById("visibleCount").textContent =
+            visible + " entr" + (visible === 1 ? "y" : "ies");
+    }
+
+    // Basic column sort
+    let sortDir = {};
+
+    function sortTable(colIndex) {
+        const tbody = document.getElementById("tableBody");
+        const rows  = Array.from(tbody.querySelectorAll("tr"));
+        const dir   = sortDir[colIndex] === "asc" ? "desc" : "asc";
+        sortDir     = {};
+        sortDir[colIndex] = dir;
+
+        // Update header highlight
+        document.querySelectorAll("thead th").forEach((th, i) => {
+            th.classList.toggle("sorted", i === colIndex);
+        });
+
+        rows.sort((a, b) => {
+            const aVal = a.cells[colIndex]?.textContent.trim() || "";
+            const bVal = b.cells[colIndex]?.textContent.trim() || "";
+
+            const aNum = parseFloat(aVal);
+            const bNum = parseFloat(bVal);
+
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return dir === "asc" ? aNum - bNum : bNum - aNum;
+            }
+
+            return dir === "asc"
+                ? aVal.localeCompare(bVal)
+                : bVal.localeCompare(aVal);
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>
+
+</body>
+</html>

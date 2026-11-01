@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — AI Recon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #080f1a;
+            --surface:   #0d1829;
+            --border:    #1a2d4a;
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --blue:      #38bdf8;
+            --red:       #ff4d6d;
+            --text:      #c8d8e8;
+            --muted:     #4a6080;
+            --mono:      'JetBrains Mono', monospace;
+            --sans:      'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Card ── */
+        .card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 380px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px;
+        }
+
+        .card-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot-red   { background: var(--red); }
+        .dot-amber { background: #fbbf24; }
+        .dot-green { background: var(--green); }
+
+        .card-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-left: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .card-body { padding: 32px 28px; }
+
+        /* ── Logo / title ── */
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .logo-text {
+            font-family: var(--mono);
+            font-size: 20px;
+            font-weight: 700;
+            color: #f0f8ff;
+        }
+
+        .logo-text span { color: var(--green); }
+
+        .logo-sub {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 6px;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Form ── */
+        .field { margin-bottom: 16px; }
+
+        label {
+            display: block;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .input-wrap { position: relative; }
+
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 13px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 12px 12px 12px 36px;
+            font-family: var(--mono);
+            font-size: 13px;
+            color: #f0f8ff;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            caret-color: var(--green);
+        }
+
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder { color: var(--muted); }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(0,255,136,0.08);
+        }
+
+        /* ── Error state ── */
+        .error-box {
+            background: rgba(255,77,109,0.06);
+            border: 1px solid rgba(255,77,109,0.2);
+            border-radius: 3px;
+            padding: 10px 14px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--red);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── Submit button ── */
+        .btn-submit {
+            width: 100%;
+            background: var(--green);
+            color: #080f1a;
+            border: none;
+            border-radius: 3px;
+            padding: 13px;
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-submit:hover {
+            background: var(--green-dim);
+            box-shadow: 0 0 20px rgba(0,255,136,0.2);
+        }
+
+        .btn-submit:active { transform: translateY(1px); }
+
+        /* ── Footer link ── */
+        .card-footer {
+            border-top: 1px solid var(--border);
+            padding: 16px 28px;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .card-footer a {
+            color: var(--blue);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .card-footer a:hover { color: var(--green); }
+
+        /* ── Page footer ── */
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: 20px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 7px;
+            height: 13px;
+            background: var(--green);
+            vertical-align: middle;
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="card-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-amber"></div>
+        <div class="dot dot-green"></div>
+        <span class="card-title">auth.sh</span>
+    </div>
+
+    <div class="card-body">
+
+        <!-- Logo -->
+        <div class="logo">
+            <div class="logo-text"><span>//</span> recon.ai<span class="cursor"></span></div>
+            <div class="logo-sub">AI Bug Bounty Recon Platform</div>
+        </div>
+
+        <!-- Error message (shown on failed login) -->
+        {% if error %}
+        <div class="error-box">
+            <span>✗</span>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Login form -->
+        <form method="POST">
+
+            <div class="field">
+                <label>Username</label>
+                <div class="input-wrap">
+                    <span class="input-icon">$</span>
+                    <input
+                        type="text"
+                        name="username"
+                        placeholder="username"
+                        autocomplete="username"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        required
+                        autofocus
+                    >
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Password</label>
+                <div class="input-wrap">
+                    <span class="input-icon">🔑</span>
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">LOGIN →</button>
+
+        </form>
+
+    </div>
+
+    <div class="card-footer">
+        No account? <a href="/register">Create one</a>
+    </div>
+</div>
+
+<footer>use only on authorized targets</footer>
+
+</body>
+</html>

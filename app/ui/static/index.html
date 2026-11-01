@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>JARVIS-X</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="login" class="login hidden">
+    <div class="login-card">
+      <h1>JARVIS-X</h1>
+      <p class="muted">Enter the local access token printed when the dashboard started.</p>
+      <input id="login-token" type="password" autocomplete="off" placeholder="Access token" aria-label="Access token">
+      <button id="login-btn" class="primary">Unlock</button>
+      <p id="login-error" class="error"></p>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">JARVIS-X</div>
+      <div id="badges" class="badges"></div>
+      <button id="logout-btn" class="ghost">Lock</button>
+    </header>
+
+    <aside class="sidebar">
+      <button id="new-session" class="primary wide">+ New session</button>
+      <ul id="session-list" class="list"></ul>
+    </aside>
+
+    <main class="chat">
+      <div id="chat-title" class="chat-title">No session selected</div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="run-status" class="run-status"></div>
+      <div id="voice-confirm" class="voice-confirm hidden">
+        <div class="muted">Voice transcript (edit if needed). Nothing is sent until you confirm.</div>
+        <textarea id="voice-text" rows="2" aria-label="Voice transcript"></textarea>
+        <div class="row">
+          <button id="voice-send" class="primary">Confirm &amp; send</button>
+          <button id="voice-discard" class="ghost">Discard</button>
+        </div>
+      </div>
+      <div class="composer">
+        <textarea id="input" rows="2" placeholder="Message JARVIS-X (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
+        <div class="row">
+          <button id="send" class="primary">Send</button>
+          <button id="mic" class="ghost hidden" title="Record a voice message (you confirm the transcript before it is sent)">🎤 Voice</button>
+          <label id="speak-wrap" class="hidden"><input id="speak-toggle" type="checkbox"> Speak replies</label>
+          <button id="stop-speech" class="ghost hidden">⏹ Stop speaking</button>
+          <span id="char-count" class="muted"></span>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <nav class="tabs">
+        <button data-tab="approvals" class="tab active">Approvals <span id="approval-count" class="pill hidden">0</span></button>
+        <button data-tab="tasks" class="tab">Tasks</button>
+        <button data-tab="settings" class="tab">Settings</button>
+      </nav>
+      <section id="tab-approvals" class="tabpane"></section>
+      <section id="tab-tasks" class="tabpane hidden"></section>
+      <section id="tab-settings" class="tabpane hidden"></section>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast hidden" role="alert"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

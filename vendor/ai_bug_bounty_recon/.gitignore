@@ -1,0 +1,24 @@
+# Windows Alternate Data Streams
+*:Zone.Identifier
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.env
+
+# Reports
+*.pdf
+*.txt
+
+# Databases
+*.db
+
+# Screenshots
+screenshots/
+
+# OS files
+.DS_Store
+Thumbs.db

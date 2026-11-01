@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Bug Bounty Recon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #080f1a;
+            --surface:   #0d1829;
+            --border:    #1a2d4a;
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --blue:      #38bdf8;
+            --red:       #ff4d6d;
+            --amber:     #fbbf24;
+            --text:      #c8d8e8;
+            --muted:     #4a6080;
+            --mono:      'JetBrains Mono', monospace;
+            --sans:      'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── Scanline overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Grid background ── */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Top nav ── */
+        nav {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--green);
+            letter-spacing: 0.08em;
+        }
+
+        .nav-logo span { color: var(--muted); }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.05em;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--green); }
+
+        /* ── Main content ── */
+        main {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 680px;
+            padding: 60px 20px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* ── Hero ── */
+        .hero {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .hero-badge {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            color: var(--green);
+            background: rgba(0,255,136,0.06);
+            border: 1px solid rgba(0,255,136,0.2);
+            padding: 4px 14px;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-family: var(--mono);
+            font-size: clamp(26px, 5vw, 40px);
+            font-weight: 700;
+            color: #f0f8ff;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+        }
+
+        h1 .accent { color: var(--green); }
+
+        .hero-sub {
+            font-size: 15px;
+            color: var(--muted);
+            max-width: 460px;
+            line-height: 1.6;
+        }
+
+        /* ── Scan card ── */
+        .scan-card {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-red    { background: var(--red); }
+        .dot-amber  { background: var(--amber); }
+        .dot-green  { background: var(--green); }
+
+        .card-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-left: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .card-body { padding: 28px; }
+
+        /* ── Form ── */
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .input-wrap {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-prefix {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--green);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 14px 14px 14px 38px;
+            font-family: var(--mono);
+            font-size: 14px;
+            color: #f0f8ff;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            caret-color: var(--green);
+        }
+
+        input[type="text"]::placeholder { color: var(--muted); }
+
+        input[type="text"]:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(0,255,136,0.08);
+        }
+
+        .btn-scan {
+            background: var(--green);
+            color: #080f1a;
+            border: none;
+            border-radius: 3px;
+            padding: 14px 24px;
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-scan:hover {
+            background: var(--green-dim);
+            box-shadow: 0 0 20px rgba(0,255,136,0.25);
+        }
+
+        .btn-scan:active { transform: translateY(1px); }
+
+        /* ── Loader ── */
+        #loader {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .terminal {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 16px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--green);
+            min-height: 28px;
+            text-align: left;
+        }
+
+        .terminal::before {
+            content: '$ ';
+            color: var(--muted);
+        }
+
+        .progress-track {
+            margin-top: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            height: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--green);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 8px rgba(0,255,136,0.5);
+        }
+
+        /* ── Stages ── */
+        .stages {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .stage {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            transition: color 0.3s;
+        }
+
+        .stage.active { color: var(--green); }
+        .stage.done   { color: var(--blue); }
+
+        .stage-icon { width: 14px; text-align: center; }
+
+        /* ── Feature grid ── */
+        .features {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .feature {
+            background: var(--surface);
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .feature:hover { background: rgba(0,255,136,0.03); }
+
+        .feature-icon {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .feature-label {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .feature-desc {
+            font-size: 11px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        /* ── History link ── */
+        .history-link {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 3px;
+            transition: color 0.2s, border-color 0.2s;
+            letter-spacing: 0.05em;
+        }
+
+        .history-link:hover {
+            color: var(--blue);
+            border-color: var(--blue);
+        }
+
+        /* ── Footer ── */
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: auto;
+            padding: 24px 20px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            border-top: 1px solid var(--border);
+            width: 100%;
+        }
+
+        /* ── Cursor blink ── */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 7px;
+            height: 13px;
+            background: var(--green);
+            vertical-align: middle;
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 540px) {
+            .features { grid-template-columns: repeat(2, 1fr); }
+            .input-row { flex-direction: column; }
+            .btn-scan { width: 100%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo"><span>//</span> recon.ai</div>
+    <ul class="nav-links">
+        <li><a href="/history">history</a></li>
+        <li><a href="/logout">logout</a></li>
+    </ul>
+</nav>
+
+<main>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-badge">Automated VAPT Platform</div>
+        <h1>Bug Bounty <span class="accent">Recon</span><br>Powered by AI</h1>
+        <p class="hero-sub">
+            Subdomain enumeration, vulnerability scanning, exploit generation,
+            and PDF reports — fully automated.
+        </p>
+    </div>
+
+    <!-- Scan card -->
+    <div class="scan-card">
+        <div class="card-header">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-amber"></div>
+            <div class="dot dot-green"></div>
+            <span class="card-title">new-scan.sh</span>
+        </div>
+        <div class="card-body">
+            <form action="/scan" method="POST" onsubmit="startScan(event)">
+                <div class="input-row">
+                    <div class="input-wrap">
+                        <span class="input-prefix">$</span>
+                        <input
+                            type="text"
+                            name="domain"
+                            placeholder="target.com"
+                            autocomplete="off"
+                            spellcheck="false"
+                            required
+                        >
+                    </div>
+                    <button type="submit" class="btn-scan" id="scanBtn">RUN SCAN</button>
+                </div>
+            </form>
+
+            <!-- Loader -->
+            <div id="loader">
+                <div style="margin-top:18px;">
+                    <div class="terminal" id="terminalText">initializing engine<span class="cursor"></span></div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressBar"></div>
+                    </div>
+                </div>
+
+                <div class="stages" id="stageList">
+                    <div class="stage" id="s0"><span class="stage-icon">◦</span> subdomain enumeration</div>
+                    <div class="stage" id="s1"><span class="stage-icon">◦</span> alive host detection</div>
+                    <div class="stage" id="s2"><span class="stage-icon">◦</span> endpoint discovery</div>
+                    <div class="stage" id="s3"><span class="stage-icon">◦</span> javascript intelligence</div>
+                    <div class="stage" id="s4"><span class="stage-icon">◦</span> vulnerability scanning</div>
+                    <div class="stage" id="s5"><span class="stage-icon">◦</span> ai exploit generation</div>
+                    <div class="stage" id="s6"><span class="stage-icon">◦</span> report generation</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+        <div class="feature">
+            <div class="feature-icon">🌐</div>
+            <div class="feature-label">Subdomain Enum</div>
+            <div class="feature-desc">crt.sh, HackerTarget, Wayback, AlienVault</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🔍</div>
+            <div class="feature-label">Vuln Scanning</div>
+            <div class="feature-desc">XSS, SQLi, SSRF, LFI, SSTI, IDOR + more</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🤖</div>
+            <div class="feature-label">AI Exploits</div>
+            <div class="feature-desc">Context-aware PoC generation via Claude API</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">📊</div>
+            <div class="feature-label">CVSS Scoring</div>
+            <div class="feature-desc">Real CVSS v3.1 math, not static lookup tables</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🗺️</div>
+            <div class="feature-label">Attack Chains</div>
+            <div class="feature-desc">Kill-chain methodology, choke point detection</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">📄</div>
+            <div class="feature-label">PDF Reports</div>
+            <div class="feature-desc">Client-ready reports with charts and remediation</div>
+        </div>
+    </div>
+
+    <a href="/history" class="history-link">📜 view scan history</a>
+
+</main>
+
+<footer>
+    AI Bug Bounty Recon &nbsp;·&nbsp; use only on authorized targets
+</footer>
+
+<script>
+    const STAGES = [
+        { id: "s0", label: "subdomain enumeration",   pct: 15 },
+        { id: "s1", label: "alive host detection",     pct: 28 },
+        { id: "s2", label: "endpoint discovery",       pct: 42 },
+        { id: "s3", label: "javascript intelligence",  pct: 56 },
+        { id: "s4", label: "vulnerability scanning",   pct: 72 },
+        { id: "s5", label: "ai exploit generation",    pct: 88 },
+        { id: "s6", label: "report generation",        pct: 96 },
+    ];
+
+    let stageIndex  = 0;
+    let progress    = 0;
+    let stageTimer  = null;
+    let progressTimer = null;
+
+    function startScan(e) {
+        const domain = document.querySelector('input[name="domain"]').value.trim();
+
+        // Show loader
+        document.getElementById("loader").style.display = "block";
+        document.getElementById("scanBtn").textContent  = "SCANNING...";
+        document.getElementById("scanBtn").disabled     = true;
+
+        // Smooth progress fill
+        progressTimer = setInterval(() => {
+            const target = stageIndex < STAGES.length
+                ? STAGES[Math.min(stageIndex, STAGES.length - 1)].pct
+                : 96;
+
+            if (progress < target) {
+                progress += 0.4;
+                document.getElementById("progressBar").style.width = progress + "%";
+            }
+        }, 100);
+
+        // Stage advancement
+        stageTimer = setInterval(advanceStage, 4500);
+        advanceStage(); // Kick off first stage immediately
+    }
+
+    function advanceStage() {
+        if (stageIndex >= STAGES.length) {
+            clearInterval(stageTimer);
+            return;
+        }
+
+        const stage = STAGES[stageIndex];
+
+        // Mark previous as done
+        if (stageIndex > 0) {
+            const prev = document.getElementById(STAGES[stageIndex - 1].id);
+            prev.classList.remove("active");
+            prev.classList.add("done");
+            prev.querySelector(".stage-icon").textContent = "✓";
+        }
+
+        // Mark current as active
+        const el = document.getElementById(stage.id);
+        el.classList.add("active");
+        el.querySelector(".stage-icon").textContent = "›";
+
+        // Update terminal
+        document.getElementById("terminalText").innerHTML =
+            `running ${stage.label}<span class="cursor"></span>`;
+
+        stageIndex++;
+    }
+</script>
+
+</body>
+</html>

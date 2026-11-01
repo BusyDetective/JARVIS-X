@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+# vendor/ai_bug_bounty_recon has its own test runner (run `python test_pipeline.py`
+# from inside that directory, with its own venv) and is not collected here.
+norecursedirs = ["vendor", ".venv", "node_modules", ".git"]

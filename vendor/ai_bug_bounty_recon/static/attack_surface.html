@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Surface — localhost:3000</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css"
+          integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
+            integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:      #080f1a;
+            --surface: #0d1829;
+            --border:  #1a2d4a;
+            --green:   #00ff88;
+            --blue:    #38bdf8;
+            --red:     #ff4d6d;
+            --amber:   #fbbf24;
+            --text:    #c8d8e8;
+            --muted:   #4a6080;
+            --mono:    'JetBrains Mono', monospace;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Nav ── */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+            z-index: 100;
+        }
+
+        .nav-logo { font-size: 13px; color: var(--green); letter-spacing: 0.08em; }
+        .nav-logo span { color: var(--muted); }
+        .nav-title { font-size: 12px; color: var(--muted); }
+
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a {
+            font-size: 11px;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.05em;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--green); }
+
+        /* ── Graph container ── */
+        #graph-wrap {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+        }
+
+        /* ── Legend ── */
+        .legend {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 14px 16px;
+            font-size: 11px;
+            color: var(--text);
+            z-index: 50;
+            min-width: 160px;
+        }
+
+        .legend-title {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            display: flex;
+            gap: 16px;
+            z-index: 50;
+        }
+
+        .stat-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .stat-pill span { color: var(--text); font-weight: 600; }
+
+        /* ── Loading bar ── */
+        #loadingBar {
+            position: absolute;
+            inset: 0;
+            background: rgba(8,15,26,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: opacity 0.5s;
+        }
+
+        .loading-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 12px;
+            letter-spacing: 0.1em;
+        }
+
+        .loading-track {
+            width: 300px;
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s;
+            box-shadow: 0 0 8px rgba(0,255,136,0.5);
+        }
+
+        #loadingPct {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        /* ── vis.js config panel dark override ── */
+        .vis-configuration-wrapper {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div>
+        <div class="nav-logo"><span>//</span> recon.ai</div>
+        <div class="nav-title" style="margin-top:3px">Attack Surface — localhost:3000</div>
+    </div>
+    <div class="nav-links">
+        <a href="javascript:history.back()">← back to results</a>
+        <a href="/">new scan</a>
+    </div>
+</nav>
+
+<div id="graph-wrap">
+    <div id="network"></div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#38bdf8;border-radius:0;transform:rotate(45deg)"></div> Root Domain</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div> Subdomain</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;border-radius:2px"></div> API Endpoint</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border-radius:2px"></div> Endpoint</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444;transform:rotate(45deg);border-radius:0"></div> Auth / Sensitive</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444;clip-path:polygon(50% 0%,100% 100%,0% 100%)"></div> Vulnerability</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff006e"></div> High Value Target</div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+        <div class="stat-pill">Nodes <span id="nodeCount">—</span></div>
+        <div class="stat-pill">Edges <span id="edgeCount">—</span></div>
+        <div class="stat-pill">HVTs <span id="hvtCount" style="color:#ff006e">—</span></div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loadingBar">
+        <div class="loading-label">BUILDING ATTACK SURFACE GRAPH</div>
+        <div class="loading-track">
+            <div class="loading-fill" id="loadingFill"></div>
+        </div>
+        <div id="loadingPct">0%</div>
+    </div>
+</div>
+
+<script>
+    var nodes = new vis.DataSet([{"id": "localhost:3000", "label": "localhost:3000", "title": "Root domain: localhost:3000", "color": "#38bdf8", "shape": "star", "size": 40, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/admin", "label": "/admin", "title": "http://localhost:3000/admin", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/administrator", "label": "/administrator", "title": "http://localhost:3000/administrator", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/login", "label": "/login", "title": "http://localhost:3000/login", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/api", "label": "/api", "title": "http://localhost:3000/api", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/api/v1", "label": "/api/v1", "title": "http://localhost:3000/api/v1", "color": "#06b6d4", "shape": "box", "size": 16, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/api/v2", "label": "/api/v2", "title": "http://localhost:3000/api/v2", "color": "#06b6d4", "shape": "box", "size": 16, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/openapi.json", "label": "/openapi.json", "title": "http://localhost:3000/openapi.json", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/auth", "label": "/auth", "title": "http://localhost:3000/auth", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/oauth", "label": "/oauth", "title": "http://localhost:3000/oauth", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/graphql", "label": "/graphql", "title": "http://localhost:3000/graphql", "color": "#06b6d4", "shape": "box", "size": 16, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/user", "label": "/user", "title": "http://localhost:3000/user", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/users", "label": "/users", "title": "http://localhost:3000/users", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/logout", "label": "/logout", "title": "http://localhost:3000/logout", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/search", "label": "/search", "title": "http://localhost:3000/search", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/signup", "label": "/signup", "title": "http://localhost:3000/signup", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/account", "label": "/account", "title": "http://localhost:3000/account", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/profile", "label": "/profile", "title": "http://localhost:3000/profile", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/callback", "label": "/callback", "title": "http://localhost:3000/callback", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/register", "label": "/register", "title": "http://localhost:3000/register", "color": "#f59e0b", "shape": "box", "size": 12, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/dashboard", "label": "/dashboard", "title": "http://localhost:3000/dashboard", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/reset-password", "label": "/reset-password", "title": "http://localhost:3000/reset-password", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "http://localhost:3000/forgot-password", "label": "/forgot-password", "title": "http://localhost:3000/forgot-password", "color": "#ef4444", "shape": "diamond", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/admin?apikey=test", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/admin?apikey=test", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/admin?apikey=test", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/admin?apikey=test", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/administrator?apikey=test", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/administrator?apikey=test", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/administrator?apikey=test", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/administrator?apikey=test", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/graphql?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/graphql?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/graphql?user=admin", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/graphql?user=admin", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/user?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/user?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/user?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/user?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/user?user=admin", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/user?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/user?user=admin", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/user?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/users?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/users?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/users?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/users?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/users?user=admin", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/users?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/users?user=admin", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/users?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/signup?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/signup?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/signup?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/signup?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/signup?user=admin", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/signup?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/signup?user=admin", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/signup?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/logout?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/logout?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/logout?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/logout?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Referrer-Policy] http://localhost:3000/logout?user=admin", "label": "Missing Referrer-Po...", "title": "Missing Referrer-Policy | Medium | http://localhost:3000/logout?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[CORS Misconfiguration] http://localhost:3000/logout?user=admin", "label": "CORS Misconfiguration", "title": "CORS Misconfiguration | Medium | http://localhost:3000/logout?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Content-Security-Policy] http://localhost:3000/account?user=admin", "label": "Missing Content-Sec...", "title": "Missing Content-Security-Policy | Medium | http://localhost:3000/account?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "[Missing Strict-Transport-Security] http://localhost:3000/account?user=admin", "label": "Missing Strict-Tran...", "title": "Missing Strict-Transport-Security | Medium | http://localhost:3000/account?user=admin", "color": "#f59e0b", "shape": "triangle", "size": 20, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/admin", "label": "★ /admin", "title": "High Value Target (score=100)\nhttp://localhost:3000/admin", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/administrator", "label": "★ /administrator", "title": "High Value Target (score=100)\nhttp://localhost:3000/administrator", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/profile", "label": "★ /profile", "title": "High Value Target (score=100)\nhttp://localhost:3000/profile", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/dashboard", "label": "★ /dashboard", "title": "High Value Target (score=100)\nhttp://localhost:3000/dashboard", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/reset-password", "label": "★ /reset-password", "title": "High Value Target (score=95)\nhttp://localhost:3000/reset-password", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/forgot-password", "label": "★ /forgot-password", "title": "High Value Target (score=95)\nhttp://localhost:3000/forgot-password", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/login", "label": "★ /login", "title": "High Value Target (score=85)\nhttp://localhost:3000/login", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/auth", "label": "★ /auth", "title": "High Value Target (score=85)\nhttp://localhost:3000/auth", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/oauth", "label": "★ /oauth", "title": "High Value Target (score=85)\nhttp://localhost:3000/oauth", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/api/v1", "label": "★ /api/v1", "title": "High Value Target (score=80)\nhttp://localhost:3000/api/v1", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/api/v2", "label": "★ /api/v2", "title": "High Value Target (score=80)\nhttp://localhost:3000/api/v2", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/openapi.json", "label": "★ /openapi.json", "title": "High Value Target (score=80)\nhttp://localhost:3000/openapi.json", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/graphql", "label": "★ /graphql", "title": "High Value Target (score=80)\nhttp://localhost:3000/graphql", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/user", "label": "★ /user", "title": "High Value Target (score=75)\nhttp://localhost:3000/user", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/users", "label": "★ /users", "title": "High Value Target (score=75)\nhttp://localhost:3000/users", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/signup", "label": "★ /signup", "title": "High Value Target (score=75)\nhttp://localhost:3000/signup", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}, {"id": "HVT:http://localhost:3000/register", "label": "★ /register", "title": "High Value Target (score=75)\nhttp://localhost:3000/register", "color": "#ff006e", "shape": "star", "size": 30, "font": {"color": "#c8d8e8"}}]);
+    var edges = new vis.DataSet([{"from": "localhost:3000", "to": "localhost:3000", "color": "#1a2d4a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/admin", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/administrator", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/login", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/api", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/api/v1", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/api/v2", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/openapi.json", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/auth", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/oauth", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/graphql", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/user", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/users", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/logout", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/search", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/signup", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/account", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/profile", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/callback", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/register", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/dashboard", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/reset-password", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "http://localhost:3000/forgot-password", "color": "#22333a", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/admin?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/administrator?apikey=test", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/graphql?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/user?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/user?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/user?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/user?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/users?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/users?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/users?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/users?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/signup?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/signup?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/signup?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/signup?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/logout?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/logout?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Referrer-Policy] http://localhost:3000/logout?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[CORS Misconfiguration] http://localhost:3000/logout?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Content-Security-Policy] http://localhost:3000/account?user=admin", "color": "#f59e0b", "width": 1}, {"from": "localhost:3000", "to": "[Missing Strict-Transport-Security] http://localhost:3000/account?user=admin", "color": "#f59e0b", "width": 1}, {"from": "http://localhost:3000/admin", "to": "HVT:http://localhost:3000/admin", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/administrator", "to": "HVT:http://localhost:3000/administrator", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/profile", "to": "HVT:http://localhost:3000/profile", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/dashboard", "to": "HVT:http://localhost:3000/dashboard", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/reset-password", "to": "HVT:http://localhost:3000/reset-password", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/forgot-password", "to": "HVT:http://localhost:3000/forgot-password", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/login", "to": "HVT:http://localhost:3000/login", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/auth", "to": "HVT:http://localhost:3000/auth", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/oauth", "to": "HVT:http://localhost:3000/oauth", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/api/v1", "to": "HVT:http://localhost:3000/api/v1", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/api/v2", "to": "HVT:http://localhost:3000/api/v2", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/openapi.json", "to": "HVT:http://localhost:3000/openapi.json", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/graphql", "to": "HVT:http://localhost:3000/graphql", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/user", "to": "HVT:http://localhost:3000/user", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/users", "to": "HVT:http://localhost:3000/users", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/signup", "to": "HVT:http://localhost:3000/signup", "color": "#ff006e", "width": 2}, {"from": "http://localhost:3000/register", "to": "HVT:http://localhost:3000/register", "color": "#ff006e", "width": 2}]);
+
+    var container = document.getElementById("network");
+    var data      = { nodes: nodes, edges: edges };
+
+    var options = {
+        nodes: {
+            borderWidth: 1,
+            borderWidthSelected: 2,
+        },
+        edges: {
+            smooth: { enabled: true, type: "dynamic" },
+            color:  { inherit: false },
+        },
+        interaction: {
+            dragNodes:        true,
+            hideEdgesOnDrag:  true,
+            tooltipDelay:     100,
+            navigationButtons: false,
+            keyboard: true,
+        },
+        physics: {
+            barnesHut: {
+                gravitationalConstant: -8000,
+                centralGravity:        0.3,
+                springLength:          200,
+                springConstant:        0.04,
+                damping:               0.15,
+                avoidOverlap:          0.1,
+            },
+            stabilization: {
+                enabled:      true,
+                iterations:   800,
+                fit:          true,
+                updateInterval: 30,
+            },
+        },
+    };
+
+    var network = new vis.Network(container, data, options);
+
+    // Update stats
+    document.getElementById("nodeCount").textContent = nodes.length;
+    document.getElementById("edgeCount").textContent = edges.length;
+    document.getElementById("hvtCount").textContent  = nodes.get().filter(n => n.id.startsWith("HVT:")).length;
+
+    // Loading bar
+    network.on("stabilizationProgress", function(params) {
+        var pct = Math.round(params.iterations / params.total * 100);
+        document.getElementById("loadingFill").style.width = pct + "%";
+        document.getElementById("loadingPct").textContent  = pct + "%";
+    });
+
+    network.once("stabilizationIterationsDone", function() {
+        document.getElementById("loadingFill").style.width = "100%";
+        document.getElementById("loadingPct").textContent  = "100%";
+        setTimeout(function() {
+            var bar = document.getElementById("loadingBar");
+            bar.style.opacity = "0";
+            setTimeout(function() { bar.style.display = "none"; }, 500);
+        }, 300);
+    });
+
+    // Click node to highlight neighbours
+    network.on("click", function(params) {
+        if (params.nodes.length > 0) {
+            network.selectNodes(params.nodes);
+        }
+    });
+</script>
+
+</body>
+</html>

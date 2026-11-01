@@ -1,0 +1,5 @@
+# OPTIONAL: browser capability (Phase 9). After installing, YOU install a browser binary, e.g.
+#   python -m playwright install chromium     (or set BROWSER_EXECUTABLE_PATH to an existing Chromium)
+# Nothing is downloaded by JARVIS-X at startup.
+-r requirements.txt
+playwright>=1.48,<2

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Running — {{ domain or task_id }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #080f1a;
+            --surface:   #0d1829;
+            --border:    #1a2d4a;
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --blue:      #38bdf8;
+            --red:       #ff4d6d;
+            --amber:     #fbbf24;
+            --text:      #c8d8e8;
+            --muted:     #4a6080;
+            --mono:      'JetBrains Mono', monospace;
+            --sans:      'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        nav {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--green);
+            letter-spacing: 0.08em;
+        }
+
+        .nav-logo span { color: var(--muted); }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.05em;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--green); }
+
+        main {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 780px;
+            padding: 48px 20px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* ── Status card ── */
+        .status-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot-red   { background: var(--red); }
+        .dot-amber { background: var(--amber); }
+        .dot-green { background: var(--green); }
+
+        .card-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-left: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .status-badge {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            padding: 3px 10px;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+
+        .badge-running {
+            color: var(--green);
+            background: rgba(0,255,136,0.08);
+            border: 1px solid rgba(0,255,136,0.2);
+        }
+
+        .badge-queued {
+            color: var(--amber);
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.2);
+        }
+
+        .badge-failed {
+            color: var(--red);
+            background: rgba(255,77,109,0.08);
+            border: 1px solid rgba(255,77,109,0.2);
+        }
+
+        .card-body { padding: 24px 28px; }
+
+        /* ── Spinner ── */
+        .spinner-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .spinner {
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .spinner.failed {
+            border-top-color: var(--red);
+            animation: none;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .spinner-info { display: flex; flex-direction: column; gap: 4px; }
+
+        .spinner-title {
+            font-family: var(--mono);
+            font-size: 15px;
+            font-weight: 700;
+            color: #f0f8ff;
+        }
+
+        .spinner-sub {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* ── Meta row ── */
+        .meta-row {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            padding: 14px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .meta-item { display: flex; flex-direction: column; gap: 3px; }
+
+        .meta-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .meta-value {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        /* ── Progress bar ── */
+        .progress-wrap { margin-bottom: 6px; }
+
+        .progress-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-track {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            height: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(0,255,136,0.4);
+            transition: width 0.6s ease;
+        }
+
+        /* ── Terminal log ── */
+        .log-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .log-header {
+            background: rgba(0,255,136,0.04);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .log-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-count {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .terminal {
+            background: var(--bg);
+            padding: 16px 20px;
+            font-family: var(--mono);
+            font-size: 12px;
+            line-height: 1.7;
+            max-height: 380px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .terminal::-webkit-scrollbar { width: 4px; }
+        .terminal::-webkit-scrollbar-track { background: transparent; }
+        .terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .log-line {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 1px 0;
+        }
+
+        .log-prefix { color: var(--muted); flex-shrink: 0; user-select: none; }
+
+        .log-text { color: var(--green); word-break: break-all; }
+
+        .log-text.warn  { color: var(--amber); }
+        .log-text.error { color: var(--red); }
+        .log-text.info  { color: var(--blue); }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 7px;
+            height: 12px;
+            background: var(--green);
+            vertical-align: middle;
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+
+        /* ── Error box ── */
+        .error-box {
+            background: rgba(255,77,109,0.06);
+            border: 1px solid rgba(255,77,109,0.2);
+            border-radius: 3px;
+            padding: 14px 18px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--red);
+            display: none;
+        }
+
+        footer {
+            position: relative;
+            z-index: 10;
+            margin-top: auto;
+            padding: 24px 20px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            border-top: 1px solid var(--border);
+            width: 100%;
+        }
+
+        @media (max-width: 540px) {
+            .meta-row { gap: 16px; }
+            .spinner-title { font-size: 13px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo"><span>//</span> recon.ai</div>
+    <ul class="nav-links">
+        <li><a href="/">new scan</a></li>
+        <li><a href="/history">history</a></li>
+        <li><a href="/logout">logout</a></li>
+    </ul>
+</nav>
+
+<main>
+
+    <!-- Status card -->
+    <div class="status-card">
+        <div class="card-header">
+            <div class="card-header-left">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-amber"></div>
+                <div class="dot dot-green"></div>
+                <span class="card-title">scan-status.sh</span>
+            </div>
+            <span class="status-badge badge-{{ status.lower() if status else 'running' }}" id="statusBadge">
+                {{ status or 'Running' }}
+            </span>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Spinner + title -->
+            <div class="spinner-row">
+                <div class="spinner {% if status == 'Failed' %}failed{% endif %}" id="spinner"></div>
+                <div class="spinner-info">
+                    <div class="spinner-title" id="scanTitle">
+                        {% if status == 'Failed' %}
+                            Scan Failed
+                        {% elif status == 'Completed' %}
+                            Scan Complete
+                        {% else %}
+                            Scanning Target...
+                        {% endif %}
+                    </div>
+                    <div class="spinner-sub" id="scanSub">
+                        {% if domain %}{{ domain }}{% else %}processing...{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meta row -->
+            <div class="meta-row">
+                <div class="meta-item">
+                    <div class="meta-label">Task ID</div>
+                    <div class="meta-value">{{ task_id[:8] if task_id else '—' }}…</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Target</div>
+                    <div class="meta-value">{{ domain or '—' }}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Status</div>
+                    <div class="meta-value" id="statusText">{{ status or 'Running' }}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Elapsed</div>
+                    <div class="meta-value" id="elapsedTimer">0s</div>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress-wrap">
+                <div class="progress-label">
+                    <span>scan progress</span>
+                    <span id="progressPct">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressBar" style="width:0%"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Error box (shown on failure) -->
+    {% if error %}
+    <div class="error-box" style="display:block">
+        ✗ {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Live log terminal -->
+    <div class="log-card">
+        <div class="log-header">
+            <div class="log-header-left">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-amber"></div>
+                <div class="dot dot-green"></div>
+                <span class="card-title">live-log.txt</span>
+            </div>
+            <span class="log-count" id="logCount">{{ logs|length }} lines</span>
+        </div>
+
+        <div class="terminal" id="terminal">
+            {% for log in logs %}
+            <div class="log-line">
+                <span class="log-prefix">&gt;</span>
+                <span class="log-text
+                    {% if '[-]' in log or 'error' in log.lower() or 'fail' in log.lower() %}error
+                    {% elif '[!]' in log or 'warn' in log.lower() %}warn
+                    {% elif '[+]' in log %}
+                    {% else %}info
+                    {% endif %}
+                ">{{ log }}</span>
+            </div>
+            {% endfor %}
+            {% if status not in ['Completed', 'Failed'] %}
+            <div class="log-line" id="cursorLine">
+                <span class="log-prefix">&gt;</span>
+                <span class="log-text"><span class="cursor"></span></span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    AI Bug Bounty Recon &nbsp;·&nbsp; auto-refreshing every 4s
+</footer>
+
+<script>
+    const TASK_ID  = "{{ task_id }}";
+    const STATUS   = "{{ status or 'Running' }}";
+
+    // ── Elapsed timer ──────────────────────────────
+    let elapsed = 0;
+    const elapsedEl = document.getElementById("elapsedTimer");
+
+    const elapsedInterval = setInterval(() => {
+        elapsed++;
+        elapsedEl.textContent = elapsed >= 60
+            ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+            : `${elapsed}s`;
+    }, 1000);
+
+    // ── Progress simulation ────────────────────────
+    const LOG_KEYWORDS = [
+        { kw: "subdomain",    pct: 12 },
+        { kw: "alive",        pct: 22 },
+        { kw: "browser",      pct: 32 },
+        { kw: "technolog",    pct: 38 },
+        { kw: "endpoint",     pct: 48 },
+        { kw: "wayback",      pct: 54 },
+        { kw: "javascript",   pct: 60 },
+        { kw: "vuln",         pct: 72 },
+        { kw: "exploit",      pct: 82 },
+        { kw: "attack",       pct: 88 },
+        { kw: "pdf",          pct: 93 },
+        { kw: "database",     pct: 96 },
+        { kw: "completed",    pct: 100 },
+    ];
+
+    let currentPct = 0;
+
+    function updateProgress(logs) {
+        let bestPct = currentPct;
+        const allText = logs.join(" ").toLowerCase();
+
+        for (const { kw, pct } of LOG_KEYWORDS) {
+            if (allText.includes(kw) && pct > bestPct) {
+                bestPct = pct;
+            }
+        }
+
+        if (bestPct > currentPct) {
+            currentPct = bestPct;
+            document.getElementById("progressBar").style.width = currentPct + "%";
+            document.getElementById("progressPct").textContent = currentPct + "%";
+        }
+    }
+
+    // ── Log renderer ───────────────────────────────
+    function renderLogs(logs) {
+        const terminal = document.getElementById("terminal");
+        const wasAtBottom =
+            terminal.scrollHeight - terminal.scrollTop <= terminal.clientHeight + 40;
+
+        terminal.innerHTML = "";
+
+        logs.forEach(log => {
+            const line = document.createElement("div");
+            line.className = "log-line";
+
+            const prefix = document.createElement("span");
+            prefix.className = "log-prefix";
+            prefix.textContent = ">";
+
+            const text = document.createElement("span");
+            let cls = "log-text";
+            const l = log.toLowerCase();
+            if (l.includes("[-]") || l.includes("error") || l.includes("fail")) cls += " error";
+            else if (l.includes("[!]") || l.includes("warn"))                    cls += " warn";
+            else if (!l.includes("[+]"))                                          cls += " info";
+            text.className = cls;
+            text.textContent = log;
+
+            line.appendChild(prefix);
+            line.appendChild(text);
+            terminal.appendChild(line);
+        });
+
+        // Blinking cursor if still running
+        if (STATUS !== "Completed" && STATUS !== "Failed") {
+            const cursorLine = document.createElement("div");
+            cursorLine.className = "log-line";
+            cursorLine.innerHTML = `<span class="log-prefix">&gt;</span><span class="log-text"><span class="cursor"></span></span>`;
+            terminal.appendChild(cursorLine);
+        }
+
+        document.getElementById("logCount").textContent = logs.length + " lines";
+
+        if (wasAtBottom) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    }
+
+    // ── Poll scan status ───────────────────────────
+    async function poll() {
+        try {
+            const res  = await fetch(`/scan_status/${TASK_ID}?json=1`);
+            const data = await res.json();
+
+            const status = data.status || "Running";
+
+            // Update status badge
+            const badge = document.getElementById("statusBadge");
+            badge.textContent = status;
+            badge.className   = `status-badge badge-${status.toLowerCase()}`;
+
+            document.getElementById("statusText").textContent = status;
+
+            // Update logs
+            if (data.logs && data.logs.length) {
+                renderLogs(data.logs);
+                updateProgress(data.logs);
+            }
+
+            // If completed → redirect to results
+            if (status === "Completed") {
+                clearInterval(elapsedInterval);
+                document.getElementById("spinner").style.animation = "none";
+                document.getElementById("progressBar").style.width = "100%";
+                document.getElementById("progressPct").textContent = "100%";
+                document.getElementById("scanTitle").textContent   = "Scan Complete";
+                setTimeout(() => {
+                    window.location.href = `/results/${TASK_ID}`;
+                }, 1200);
+                return;
+            }
+
+            // If failed → stop polling
+            if (status === "Failed") {
+                clearInterval(elapsedInterval);
+                clearInterval(pollInterval);
+                document.getElementById("spinner").classList.add("failed");
+                document.getElementById("scanTitle").textContent = "Scan Failed";
+                if (data.error) {
+                    const errBox = document.querySelector(".error-box");
+                    if (errBox) {
+                        errBox.style.display = "block";
+                        errBox.textContent   = "✗ " + data.error;
+                    }
+                }
+                return;
+            }
+
+        } catch (e) {
+            console.warn("Poll error:", e);
+        }
+    }
+
+    // Auto-scroll terminal to bottom on load
+    const terminal = document.getElementById("terminal");
+    if (terminal) terminal.scrollTop = terminal.scrollHeight;
+
+    // Don't poll if already done
+    let pollInterval = null;
+    if (STATUS !== "Completed" && STATUS !== "Failed") {
+        poll(); // Immediate first call
+        pollInterval = setInterval(poll, 4000);
+    } else {
+        clearInterval(elapsedInterval);
+    }
+</script>
+
+</body>
+</html>
